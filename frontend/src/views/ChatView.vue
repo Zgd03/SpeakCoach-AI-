@@ -27,6 +27,7 @@ const {
 
 const inputText = ref("");
 const isProcessing = ref(false);
+const starting = ref(false);
 const messagesEnd = ref(null);
 const sessionLoaded = ref(false);
 
@@ -89,6 +90,23 @@ function sendTextMessage() {
     isProcessing.value = false;
   }, 1000);
 }
+
+function handleStart() {
+  starting.value = true;
+  sendStart();
+  // Safety: clear loading state after 20s even if no response
+  setTimeout(() => {
+    if (starting.value) starting.value = false;
+  }, 20000);
+}
+
+// Watch for started/error to clear loading state
+watch(started, (val) => {
+  if (val) starting.value = false;
+});
+watch(wsError, () => {
+  starting.value = false;
+});
 
 function handleRecordStart() {
   startSpeech();
@@ -157,12 +175,19 @@ function handleKeydown(e) {
           <p>准备好了吗？点击下方按钮开始练习！</p>
           <p class="start-hint">AI 将根据场景自动生成开场白</p>
           <button
-            v-if="connected"
+            v-if="connected && !starting"
             class="btn btn-primary btn-start"
-            :disabled="isProcessing"
-            @click="sendStart"
+            @click="handleStart"
           >
             🚀 开始练习
+          </button>
+          <button
+            v-else-if="connected && starting"
+            class="btn btn-primary btn-start btn-loading"
+            disabled
+          >
+            <span class="spinner-sm"></span>
+            AI 准备中...
           </button>
           <button v-else class="btn btn-secondary" disabled>连接中...</button>
         </div>
@@ -338,6 +363,26 @@ function handleKeydown(e) {
 .btn-start:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+}
+
+.btn-loading {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.btn-loading:hover {
+  transform: none;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+}
+
+.spinner-sm {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }
 
 .input-area {

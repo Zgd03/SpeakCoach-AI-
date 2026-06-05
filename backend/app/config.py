@@ -18,7 +18,7 @@ def _find_env_file() -> str:
 
 class Settings(BaseSettings):
     deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
+    deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
     database_url: str = "sqlite:///./speakcoach.db"
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
         "env_file": _find_env_file(),
         "env_file_encoding": "utf-8",
     }
+
+    @property
+    def effective_api_url(self) -> str:
+        """Get the full chat completions URL, handling optional /v1 prefix."""
+        base = self.deepseek_base_url.rstrip("/")
+        if base.endswith("/v1"):
+            return f"{base}/chat/completions"
+        return f"{base}/v1/chat/completions"
 
 
 settings = Settings()

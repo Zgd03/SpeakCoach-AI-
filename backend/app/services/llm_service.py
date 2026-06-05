@@ -57,9 +57,9 @@ async def call_deepseek(system_prompt: str, conversation_history: list[dict]) ->
     try:
         messages = _build_messages(system_prompt, conversation_history)
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
-                f"{settings.deepseek_base_url}/chat/completions",
+                settings.effective_api_url,
                 headers={
                     "Authorization": f"Bearer {settings.deepseek_api_key}",
                     "Content-Type": "application/json",
@@ -125,9 +125,9 @@ async def generate_opening(system_prompt: str) -> str:
             {"role": "system", "content": OPENING_TEMPLATE.format(scenario=system_prompt)},
         ]
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.post(
-                f"{settings.deepseek_base_url}/chat/completions",
+                settings.effective_api_url,
                 headers={
                     "Authorization": f"Bearer {settings.deepseek_api_key}",
                     "Content-Type": "application/json",
