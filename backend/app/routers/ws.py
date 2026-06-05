@@ -38,6 +38,48 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
             data = await websocket.receive_text()
             msg = json.loads(data)
 
+            # ── Start event: AI speaks first (opening line) ──
+            if msg.get("type") == "start":
+                opening_prompt = (
+                    system_prompt
+                    + "\n\nThe conversation is just starting. "
+                    "Greet the user warmly and ask an opening question "
+                    "to begin the conversation. "
+                    "Your reply should be the first thing the user hears."
+                )
+                llm_result = await call_deepseek(opening_prompt, conversation_history)
+
+                reply_text = llm_result.get("reply", "")
+                corrections_data = llm_result.get("corrections", [])
+                score_data = llm_result.get("score", {})
+
+                # Save assistant message
+                assistant_msg = Message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=reply_text,
+                    grammar_score=score_data.get("grammar"),
+                    fluency_score=score_data.get("fluency"),
+                    vocabulary_score=score_data.get("vocabulary"),
+                )
+                db.add(assistant_msg)
+                db.commit()
+                db.refresh(assistant_msg)
+
+                conversation_history.append({"role": "assistant", "content": reply_text})
+
+                # Synthesize speech
+                audio_bytes = await text_to_speech(reply_text)
+                audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+
+                await websocket.send_json({
+                    "type": "ai_reply",
+                    "audio": audio_b64,
+                    "text": reply_text,
+                })
+                continue
+
+            # ── User message event ──
             if msg.get("type") == "user_message" and msg.get("text"):
                 user_text = msg["text"].strip()
                 if not user_text:
@@ -91,7 +133,7 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
 
                 conversation_history.append({"role": "assistant", "content": reply_text})
 
-                # Synthesize speech (run in thread pool to avoid blocking)
+                # Synthesize speech
                 audio_bytes = await text_to_speech(reply_text)
                 audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 

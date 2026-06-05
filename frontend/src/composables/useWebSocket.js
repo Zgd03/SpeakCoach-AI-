@@ -32,7 +32,7 @@ export function useWebSocket() {
             content: data.text,
             corrections: [],
           });
-          // Play audio
+          // Play audio with user interaction tracking
           if (data.audio) {
             playAudio(data.audio);
           }
@@ -82,6 +82,13 @@ export function useWebSocket() {
     }
   }
 
+  /** Send a "start" event to trigger the AI to speak first (opening line). */
+  function sendStart() {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({ type: "start" }));
+    }
+  }
+
   function playAudio(base64Data) {
     try {
       const binaryStr = atob(base64Data);
@@ -93,11 +100,12 @@ export function useWebSocket() {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
-      audio.play().catch(() => {
-        // Autoplay may be blocked, user interaction needed
+      audio.play().catch((err) => {
+        console.warn("音频自动播放失败（浏览器限制）:", err);
+        // The audio will still be playable after user interaction
       });
     } catch (e) {
-      console.error("Audio playback failed:", e);
+      console.error("音频播放失败:", e);
     }
   }
 
@@ -115,6 +123,7 @@ export function useWebSocket() {
     error,
     connect,
     sendMessage,
+    sendStart,
     disconnect,
   };
 }
