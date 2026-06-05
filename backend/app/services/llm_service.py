@@ -100,3 +100,62 @@ def _fallback_response(user_text: str) -> dict:
         "corrections": [],
         "score": {"grammar": 80, "fluency": 75, "vocabulary": 78},
     }
+
+
+# ---- Opening line generation ----
+
+OPENING_TEMPLATE = """You are an English speaking coach for the scenario: {scenario}
+
+Your task is to start the conversation with a natural opening line in English.
+Speak as the conversation partner (e.g. waiter, interviewer, colleague) to begin the role-play.
+
+Return ONLY the opening line — no JSON, no extra text, no markdown.
+The line should be natural, friendly, and appropriate for the scenario.
+"""
+
+
+async def generate_opening(system_prompt: str) -> str:
+    """Generate an opening line for the given scenario."""
+    if not settings.deepseek_api_key:
+        logger.warning("DEEPSEEK_API_KEY not set, using fallback opening")
+        return _fallback_opening(system_prompt)
+
+    try:
+        messages = [
+            {"role": "system", "content": OPENING_TEMPLATE.format(scenario=system_prompt)},
+        ]
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{settings.deepseek_base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.deepseek_model,
+                    "messages": messages,
+                    "temperature": 0.8,
+                    "max_tokens": 128,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+            return content.strip().strip('"').strip("'")
+
+    except Exception as e:
+        logger.error(f"Opening generation failed: {e}")
+        return _fallback_opening(system_prompt)
+
+
+def _fallback_opening(scenario_prompt: str) -> str:
+    """Fallback opening lines based on scenario keywords."""
+    s = scenario_prompt.lower()
+    if "interview" in s or "面试" in s:
+        return "Hello! Thank you for coming in today. Could you start by telling me a little about yourself and your background?"
+    if "restaurant" in s or "餐厅" in s or "点餐" in s:
+        return "Welcome to our restaurant! Here's a menu for you. Would you like to start with some drinks, or shall I tell you about today's specials?"
+    if "meeting" in s or "会议" in s or "商务" in s:
+        return "Good morning, everyone. Thanks for joining today's meeting. Let's start by going over the agenda. Who would like to begin with their project update?"
+    return "Hello! Welcome to today's practice session. How are you doing today?"

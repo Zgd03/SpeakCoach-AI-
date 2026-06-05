@@ -7,6 +7,7 @@ export function useWebSocket() {
   const currentCorrections = ref([]);
   const currentScores = ref(null);
   const error = ref(null);
+  const started = ref(false);
 
   let pendingResolve = null;
 
@@ -27,12 +28,15 @@ export function useWebSocket() {
 
       switch (data.type) {
         case "ai_reply":
+          if (data.is_opening) {
+            started.value = true;
+          }
           messages.value.push({
             role: "assistant",
             content: data.text,
             corrections: [],
           });
-          // Play audio with user interaction tracking
+          // Play audio
           if (data.audio) {
             playAudio(data.audio);
           }
@@ -71,6 +75,12 @@ export function useWebSocket() {
     };
   }
 
+  function sendStart() {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({ type: "start" }));
+    }
+  }
+
   function sendMessage(text) {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       messages.value.push({
@@ -79,13 +89,6 @@ export function useWebSocket() {
         corrections: [],
       });
       ws.value.send(JSON.stringify({ type: "user_message", text }));
-    }
-  }
-
-  /** Send a "start" event to trigger the AI to speak first (opening line). */
-  function sendStart() {
-    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-      ws.value.send(JSON.stringify({ type: "start" }));
     }
   }
 
@@ -100,12 +103,11 @@ export function useWebSocket() {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
-      audio.play().catch((err) => {
-        console.warn("音频自动播放失败（浏览器限制）:", err);
-        // The audio will still be playable after user interaction
+      audio.play().catch(() => {
+        // Autoplay may be blocked, user interaction needed
       });
     } catch (e) {
-      console.error("音频播放失败:", e);
+      console.error("Audio playback failed:", e);
     }
   }
 
@@ -121,9 +123,10 @@ export function useWebSocket() {
     currentCorrections,
     currentScores,
     error,
+    started,
     connect,
-    sendMessage,
     sendStart,
+    sendMessage,
     disconnect,
   };
 }
