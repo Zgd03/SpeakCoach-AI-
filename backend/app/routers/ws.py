@@ -2,10 +2,7 @@ import json
 import base64
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from sqlalchemy.orm import Session
-
-from app.database import get_db
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.models.db_models import Session, Scenario, Message, Correction
 from app.services.llm_service import call_deepseek
 from app.services.tts_service import text_to_speech
@@ -38,8 +35,11 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
             data = await websocket.receive_text()
             msg = json.loads(data)
 
+            msg_type = msg.get("type")
+            logger.info(f"WebSocket received: type={msg_type}, session={session_id}")
+
             # ── Start event: AI speaks first (opening line) ──
-            if msg.get("type") == "start":
+            if msg_type == "start":
                 opening_prompt = (
                     system_prompt
                     + "\n\nThe conversation is just starting. "
@@ -80,7 +80,7 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
                 continue
 
             # ── User message event ──
-            if msg.get("type") == "user_message" and msg.get("text"):
+            if msg_type == "user_message" and msg.get("text"):
                 user_text = msg["text"].strip()
                 if not user_text:
                     continue

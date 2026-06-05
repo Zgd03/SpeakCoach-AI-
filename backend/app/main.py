@@ -1,9 +1,18 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
 from app.models import db_models  # noqa: ensure models are loaded
 from app.routers import scenarios, sessions, ws
+
+# Configure logging so ws.py output appears in uvicorn logs
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler()],
+)
 
 app = FastAPI(title="SpeakCoach AI", version="0.1.0")
 

@@ -33,6 +33,15 @@ const sessionLoaded = ref(false);
 const hasStarted = ref(false);
 const isWaitingForAI = ref(false);
 const scenarioName = ref("");
+const startError = ref("");
+let startTimeoutId = null;
+
+function clearStartTimeout() {
+  if (startTimeoutId) {
+    clearTimeout(startTimeoutId);
+    startTimeoutId = null;
+  }
+}
 
 // Load existing messages + scenario info on mount
 onMounted(async () => {
@@ -62,6 +71,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  clearStartTimeout();
   disconnect();
 });
 
@@ -77,8 +87,10 @@ watch(
 // When the first AI message arrives (the opening line), switch to chat mode
 watch(messages, (msgs) => {
   if (!hasStarted.value && msgs.length === 1 && msgs[0].role === "assistant") {
+    clearStartTimeout();
     hasStarted.value = true;
     isWaitingForAI.value = false;
+    startError.value = "";
   }
 }, { deep: true });
 
@@ -95,7 +107,16 @@ watch(transcript, (val) => {
 
 function handleStart() {
   isWaitingForAI.value = true;
+  startError.value = "";
   sendStart();
+  // Timeout: if no AI reply within 25 seconds, show error
+  clearStartTimeout();
+  startTimeoutId = setTimeout(() => {
+    if (isWaitingForAI.value) {
+      isWaitingForAI.value = false;
+      startError.value = "AI 响应超时，请检查后端日志确认 DeepSeek API 是否正常。";
+    }
+  }, 25000);
 }
 
 function sendTextMessage() {
@@ -170,6 +191,7 @@ function handleKeydown(e) {
           <span v-else>🎯 开始练习</span>
         </button>
         <p v-if="!connected" class="connecting-hint">正在连接服务器...</p>
+        <p v-if="startError" class="start-error">{{ startError }}</p>
       </div>
     </div>
 
@@ -343,6 +365,15 @@ function handleKeydown(e) {
   margin-top: 12px;
   font-size: 13px;
   color: #9ca3af;
+}
+
+.start-error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 8px 12px;
+  border-radius: 8px;
 }
 
 /* ── Score Bar ── */
