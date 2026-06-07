@@ -4,11 +4,30 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.models.db_models import Session, Scenario, Message, Correction
-from app.services.llm_service import call_deepseek, generate_opening
+from app.services.llm_service import call_deepseek
 from app.services.tts_service import text_to_speech
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Pre-defined opening lines per scenario keyword
+_OPENING_LINES = {
+    "interview": "Hello! Thank you for coming in today. Could you start by telling me a little about yourself and your background?",
+    "restaurant": "Welcome to our restaurant! Here's a menu for you. Would you like to start with some drinks, or shall I tell you about today's specials?",
+    "meeting": "Good morning, everyone. Thanks for joining today's meeting. Let's start by going over the agenda. Who would like to begin with their project update?",
+}
+
+
+def _get_opening_line(system_prompt: str) -> str:
+    """Look up a pre-defined opening line based on scenario keywords."""
+    s = system_prompt.lower()
+    if "interview" in s:
+        return _OPENING_LINES["interview"]
+    if "restaurant" in s:
+        return _OPENING_LINES["restaurant"]
+    if "meeting" in s:
+        return _OPENING_LINES["meeting"]
+    return _OPENING_LINES["interview"]
 
 
 @router.websocket("/ws/{session_id}")
@@ -31,8 +50,8 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
 
         conversation_history = []
 
-        # Auto-generate opening line for the scenario
-        opening_text = await generate_opening(system_prompt)
+        # Look up pre-defined opening line for the scenario
+        opening_text = _get_opening_line(system_prompt)
         if opening_text:
             # Save assistant message
             assistant_msg = Message(
