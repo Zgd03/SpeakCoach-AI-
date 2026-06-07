@@ -18,9 +18,11 @@ const {
   messages,
   currentCorrections,
   currentScores,
+  audioPlaying,
   error: wsError,
   connect,
   sendMessage,
+  replayAudio,
   disconnect,
 } = useWebSocket();
 
@@ -105,6 +107,10 @@ async function handleEndSession() {
   }
 }
 
+function handleReplay(index) {
+  replayAudio(index);
+}
+
 function handleKeydown(e) {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -158,6 +164,9 @@ function handleKeydown(e) {
         :role="msg.role"
         :content="msg.content"
         :corrections="msg.corrections || []"
+        :is-playing="audioPlaying && i === messages.length - 1 && msg.role === 'assistant'"
+        :has-audio="!!msg.audioData"
+        @replay="handleReplay(i)"
       />
       <div ref="messagesEnd" />
     </div>
