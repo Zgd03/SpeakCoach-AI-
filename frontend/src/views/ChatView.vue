@@ -156,7 +156,11 @@ function handleKeydown(e) {
     <!-- Chat messages -->
     <div class="chat-messages">
       <div v-if="messages.length === 0 && sessionLoaded" class="empty-chat">
-        <p>点击「开始录音」或输入文字开始对话吧！</p>
+        <div v-if="connected" class="opening-prompt">
+          <div class="spinner"></div>
+          <p>AI 正在准备开场白...</p>
+        </div>
+        <p v-else>正在连接...</p>
       </div>
       <ChatBubble
         v-for="(msg, i) in messages"
@@ -296,6 +300,18 @@ function handleKeydown(e) {
   text-align: center;
   color: #9ca3af;
   padding: 60px 20px;
+}
+
+.opening-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.opening-prompt .spinner {
+  width: 32px;
+  height: 32px;
 }
 
 .input-area {

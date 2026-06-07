@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.models.db_models import Session, Scenario, Message, Correction
-from app.services.llm_service import call_deepseek
+from app.services.llm_service import call_deepseek, generate_opening
 from app.services.tts_service import text_to_speech
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,33 @@ async def conversation_websocket(websocket: WebSocket, session_id: str):
         system_prompt = scenario.system_prompt if scenario else "You are an English speaking coach."
 
         conversation_history = []
+
+        # Auto-generate opening line for the scenario
+        opening_text = await generate_opening(system_prompt)
+        if opening_text:
+            # Save assistant message
+            assistant_msg = Message(
+                session_id=session_id,
+                role="assistant",
+                content=opening_text,
+            )
+            db.add(assistant_msg)
+            db.commit()
+            db.refresh(assistant_msg)
+
+            conversation_history.append({"role": "assistant", "content": opening_text})
+
+            # Synthesize and send opening line
+            audio_b64 = ""
+            if opening_text:
+                audio_bytes = await text_to_speech(opening_text)
+                audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+
+            await websocket.send_json({
+                "type": "ai_reply",
+                "audio": audio_b64,
+                "text": opening_text,
+            })
 
         while True:
             data = await websocket.receive_text()
