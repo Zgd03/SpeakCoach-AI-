@@ -1,5 +1,7 @@
 # SpeakCoach AI — 英语口语练习工具
 
+七牛云第三期比赛题目1
+demo视频介绍：https://www.bilibili.com/video/BV1CVEh6zEGv/
 基于 AI 的英语口语对话练习工具，支持多种真实场景的语音交互训练，提供实时纠错、评分分析和课后总结。
 
 ## 功能特性
