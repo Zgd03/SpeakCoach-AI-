@@ -7,7 +7,6 @@ export function useWebSocket() {
   const currentCorrections = ref([]);
   const currentScores = ref(null);
   const error = ref(null);
-  const started = ref(false);
 
   let pendingResolve = null;
 
@@ -28,9 +27,6 @@ export function useWebSocket() {
 
       switch (data.type) {
         case "ai_reply":
-          if (data.is_opening) {
-            started.value = true;
-          }
           messages.value.push({
             role: "assistant",
             content: data.text,
@@ -75,12 +71,6 @@ export function useWebSocket() {
     };
   }
 
-  function sendStart() {
-    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-      ws.value.send(JSON.stringify({ type: "start" }));
-    }
-  }
-
   function sendMessage(text) {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       messages.value.push({
@@ -123,9 +113,7 @@ export function useWebSocket() {
     currentCorrections,
     currentScores,
     error,
-    started,
     connect,
-    sendStart,
     sendMessage,
     disconnect,
   };

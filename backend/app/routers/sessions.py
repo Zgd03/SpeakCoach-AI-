@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models.db_models import Session, Scenario, Message, Correction
@@ -112,21 +112,17 @@ async def get_summary(session_id: str, db: Session = Depends(get_db)):
     scenario = db.query(Scenario).filter(Scenario.id == session.scenario_id).first()
     messages = (
         db.query(Message)
+        .options(selectinload(Message.corrections))
         .filter(Message.session_id == session_id)
         .order_by(Message.created_at)
         .all()
     )
 
-    # Build conversation transcript
+    # Build conversation transcript (corrections eager-loaded)
     conversation_lines = []
     for msg in messages:
         conversation_lines.append(f"{msg.role}: {msg.content}")
-        corrections = (
-            db.query(Correction)
-            .filter(Correction.message_id == msg.id)
-            .all()
-        )
-        for c in corrections:
+        for c in msg.corrections:
             conversation_lines.append(f"  [correction] {c.original} → {c.corrected} ({c.explanation})")
 
     conversation_text = "\n".join(conversation_lines)

@@ -51,7 +51,7 @@ async def generate_summary(conversation_text: str) -> dict:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                f"{settings.deepseek_base_url}/chat/completions",
+                settings.api_chat_url,
                 headers={
                     "Authorization": f"Bearer {settings.deepseek_api_key}",
                     "Content-Type": "application/json",

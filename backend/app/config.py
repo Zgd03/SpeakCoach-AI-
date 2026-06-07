@@ -1,14 +1,14 @@
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
 
 def _find_env_file() -> str:
-    """Search for .env in CWD first, then in parent directory (project root)."""
+    """Search for .env in multiple locations, preferring CWD and project root."""
     candidates = [
         Path.cwd() / ".env",
         Path.cwd().parent / ".env",
+        Path(__file__).resolve().parent.parent.parent / ".env",
     ]
     for p in candidates:
         if p.exists():
@@ -23,13 +23,11 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./speakcoach.db"
 
-    model_config = {
-        "env_file": _find_env_file(),
-        "env_file_encoding": "utf-8",
-    }
+    model_config = {"env_file": _find_env_file(), "env_file_encoding": "utf-8"}
+
 
     @property
-    def effective_api_url(self) -> str:
+    def api_chat_url(self) -> str:
         """Get the full chat completions URL, handling optional /v1 prefix."""
         base = self.deepseek_base_url.rstrip("/")
         if base.endswith("/v1"):

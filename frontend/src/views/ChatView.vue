@@ -16,18 +16,16 @@ const { isListening, transcript, error: speechError, start: startSpeech, stop: s
 const {
   connected,
   messages,
+  currentCorrections,
   currentScores,
   error: wsError,
-  started,
   connect,
-  sendStart,
   sendMessage,
   disconnect,
 } = useWebSocket();
 
 const inputText = ref("");
 const isProcessing = ref(false);
-const starting = ref(false);
 const messagesEnd = ref(null);
 const sessionLoaded = ref(false);
 
@@ -47,7 +45,6 @@ onMounted(async () => {
           });
         }
       });
-      started.value = true; // Existing session, show input area
     }
   } catch (e) {
     // Session might be new, that's fine
@@ -90,23 +87,6 @@ function sendTextMessage() {
     isProcessing.value = false;
   }, 1000);
 }
-
-function handleStart() {
-  starting.value = true;
-  sendStart();
-  // Safety: clear loading state after 20s even if no response
-  setTimeout(() => {
-    if (starting.value) starting.value = false;
-  }, 20000);
-}
-
-// Watch for started/error to clear loading state
-watch(started, (val) => {
-  if (val) starting.value = false;
-});
-watch(wsError, () => {
-  starting.value = false;
-});
 
 function handleRecordStart() {
   startSpeech();
@@ -169,28 +149,8 @@ function handleKeydown(e) {
 
     <!-- Chat messages -->
     <div class="chat-messages">
-      <div v-if="messages.length === 0 && sessionLoaded && !started" class="empty-chat">
-        <div class="start-prompt">
-          <p class="start-icon">🎯</p>
-          <p>准备好了吗？点击下方按钮开始练习！</p>
-          <p class="start-hint">AI 将根据场景自动生成开场白</p>
-          <button
-            v-if="connected && !starting"
-            class="btn btn-primary btn-start"
-            @click="handleStart"
-          >
-            🚀 开始练习
-          </button>
-          <button
-            v-else-if="connected && starting"
-            class="btn btn-primary btn-start btn-loading"
-            disabled
-          >
-            <span class="spinner-sm"></span>
-            AI 准备中...
-          </button>
-          <button v-else class="btn btn-secondary" disabled>连接中...</button>
-        </div>
+      <div v-if="messages.length === 0 && sessionLoaded" class="empty-chat">
+        <p>点击「开始录音」或输入文字开始对话吧！</p>
       </div>
       <ChatBubble
         v-for="(msg, i) in messages"
@@ -203,10 +163,10 @@ function handleKeydown(e) {
     </div>
 
     <!-- Corrections panel -->
-    <CorrectionPanel :corrections="[]" />
+    <CorrectionPanel :corrections="currentCorrections" />
 
-    <!-- Input area (only shown after practice starts) -->
-    <div v-if="started || messages.length > 0" class="input-area">
+    <!-- Input area -->
+    <div class="input-area">
       <VoiceRecorder
         :is-recording="isListening"
         :is-processing="isProcessing"
@@ -324,65 +284,9 @@ function handleKeydown(e) {
 }
 
 .empty-chat {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
   color: #9ca3af;
   padding: 60px 20px;
-}
-
-.start-prompt {
-  text-align: center;
-}
-
-.start-icon {
-  font-size: 56px;
-  margin-bottom: 16px;
-}
-
-.start-prompt p {
-  font-size: 18px;
-  color: #6b7280;
-  margin-bottom: 8px;
-}
-
-.start-hint {
-  font-size: 14px !important;
-  color: #9ca3af !important;
-  margin-bottom: 24px !important;
-}
-
-.btn-start {
-  font-size: 18px;
-  padding: 14px 40px;
-  border-radius: 50px;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-  transition: all 0.2s;
-}
-
-.btn-start:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
-}
-
-.btn-loading {
-  cursor: wait;
-  opacity: 0.8;
-}
-
-.btn-loading:hover {
-  transform: none;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-}
-
-.spinner-sm {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
 }
 
 .input-area {

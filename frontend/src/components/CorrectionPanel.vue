@@ -5,6 +5,16 @@ defineProps({
     default: () => [],
   },
 });
+
+function errorTypeLabel(type) {
+  const labels = {
+    grammar: "语法",
+    pronunciation: "发音",
+    expression: "表达",
+    word_choice: "用词",
+  };
+  return labels[type] || type;
+}
 </script>
 
 <template>
@@ -21,22 +31,6 @@ defineProps({
     </div>
   </div>
 </template>
-
-<script>
-export default {
-  methods: {
-    errorTypeLabel(type) {
-      const labels = {
-        grammar: "语法",
-        pronunciation: "发音",
-        expression: "表达",
-        word_choice: "用词",
-      };
-      return labels[type] || type;
-    },
-  },
-};
-</script>
 
 <style scoped>
 .correction-panel {
