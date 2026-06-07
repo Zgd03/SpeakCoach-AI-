@@ -5,6 +5,14 @@ from pydantic import BaseModel
 
 
 # ---- Scenario ----
+class ScenarioCreate(BaseModel):
+    name: str
+    description: str = ""
+    icon: str = "🎯"
+    difficulty: str = "中级"
+    system_prompt: str = ""
+
+
 class ScenarioOut(BaseModel):
     id: int
     name: str
@@ -79,6 +87,7 @@ class SessionListItem(BaseModel):
 
 class SessionList(BaseModel):
     sessions: list[SessionListItem]
+    total: int
 
 
 # ---- Summary ----

@@ -4,9 +4,13 @@ defineProps({
     type: Object,
     required: true,
   },
+  showDelete: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-defineEmits(["select"]);
+defineEmits(["select", "delete"]);
 </script>
 
 <template>
@@ -19,11 +23,20 @@ defineEmits(["select"]);
         {{ scenario.difficulty }}
       </span>
     </div>
+    <button
+      v-if="showDelete"
+      class="btn-delete"
+      title="删除场景"
+      @click.stop="$emit('delete', scenario.id)"
+    >
+      🗑️
+    </button>
   </div>
 </template>
 
 <style scoped>
 .scene-card {
+  position: relative;
   background: #fff;
   border: 2px solid #e5e7eb;
   border-radius: 16px;
@@ -85,5 +98,24 @@ defineEmits(["select"]);
 .scene-difficulty.高级 {
   background: #fce7f3;
   color: #9d174d;
+}
+
+.btn-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.4;
+  padding: 4px;
+  border-radius: 6px;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.scene-card:hover .btn-delete {
+  opacity: 1;
+  background: #fef2f2;
 }
 </style>

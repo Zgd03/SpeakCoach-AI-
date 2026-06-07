@@ -1,16 +1,22 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { fetchSessions } from "../services/api";
+import { fetchSessions, deleteSession } from "../services/api";
 
 const router = useRouter();
 const sessions = ref([]);
 const loading = ref(true);
+const loadingMore = ref(false);
 const error = ref(null);
+const deletingId = ref(null);
+const total = ref(0);
+const PAGE_SIZE = 20;
 
 onMounted(async () => {
   try {
-    sessions.value = await fetchSessions();
+    const data = await fetchSessions(0, PAGE_SIZE);
+    sessions.value = data.sessions;
+    total.value = data.total;
   } catch (e) {
     error.value = "无法加载历史记录";
   } finally {
@@ -18,8 +24,36 @@ onMounted(async () => {
   }
 });
 
+async function loadMore() {
+  loadingMore.value = true;
+  try {
+    const data = await fetchSessions(sessions.value.length, PAGE_SIZE);
+    sessions.value = sessions.value.concat(data.sessions);
+  } catch (e) {
+    error.value = "加载更多失败";
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
 function viewSummary(sessionId) {
   router.push({ name: "Summary", params: { sessionId } });
+}
+
+async function confirmDelete(e, session) {
+  e.stopPropagation();
+  const name = session.scenario_name || "对话练习";
+  if (!confirm(`确定要删除「${name}」的练习记录吗？此操作不可撤销。`)) return;
+
+  deletingId.value = session.id;
+  try {
+    await deleteSession(session.id);
+    sessions.value = sessions.value.filter((s) => s.id !== session.id);
+  } catch (err) {
+    alert("删除失败，请稍后重试");
+  } finally {
+    deletingId.value = null;
+  }
 }
 
 function formatDate(dateStr) {
@@ -65,7 +99,23 @@ function formatDate(dateStr) {
           <span class="score">{{ Math.round(s.overall_score) }}</span>
           <span class="score-unit">分</span>
         </div>
+        <button
+          class="btn btn-danger btn-delete"
+          :disabled="deletingId === s.id"
+          @click="(e) => confirmDelete(e, s)"
+        >
+          {{ deletingId === s.id ? "删除中..." : "🗑️" }}
+        </button>
         <div class="session-arrow">→</div>
+      </div>
+      <div v-if="sessions.length < total" class="load-more">
+        <button
+          class="btn btn-secondary"
+          :disabled="loadingMore"
+          @click="loadMore"
+        >
+          {{ loadingMore ? "加载中..." : `加载更多（${sessions.length}/${total}）` }}
+        </button>
       </div>
     </div>
   </div>
@@ -155,5 +205,27 @@ function formatDate(dateStr) {
 .session-arrow {
   color: #d1d5db;
   font-size: 18px;
+}
+
+.btn-delete {
+  padding: 6px 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.session-card:hover .btn-delete {
+  opacity: 1;
+}
+
+.btn-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.load-more {
+  text-align: center;
+  margin-top: 8px;
 }
 </style>

@@ -8,6 +8,7 @@ export function useSpeechRecognition() {
   const error = ref(null);
 
   let recognition = null;
+  let accumulatedTranscript = "";
 
   function start() {
     if (!isSupported) {
@@ -19,14 +20,33 @@ export function useSpeechRecognition() {
       window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
     recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    accumulatedTranscript = "";
+
     recognition.onresult = (event) => {
-      const result = event.results[0][0].transcript;
-      transcript.value = result;
-      isListening.value = false;
+      let interim = "";
+      let final = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+
+      if (final) {
+        accumulatedTranscript += (accumulatedTranscript ? " " : "") + final.trim();
+        transcript.value = accumulatedTranscript;
+      } else if (interim) {
+        transcript.value = accumulatedTranscript
+          ? accumulatedTranscript + " " + interim
+          : interim;
+      }
     };
 
     recognition.onerror = (event) => {
@@ -45,10 +65,25 @@ export function useSpeechRecognition() {
   }
 
   function stop() {
-    if (recognition) {
+    return new Promise((resolve) => {
+      if (!recognition) {
+        resolve("");
+        return;
+      }
+
+      // Guard: if already stopped, resolve immediately
+      const originalOnEnd = recognition.onend;
+      recognition.onend = () => {
+        isListening.value = false;
+        if (originalOnEnd && originalOnEnd !== recognition.onend) {
+          originalOnEnd();
+        }
+        // Give a microtask for the final onresult to settle
+        setTimeout(() => resolve(transcript.value), 0);
+      };
+
       recognition.stop();
-      isListening.value = false;
-    }
+    });
   }
 
   return {

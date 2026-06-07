@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -75,7 +76,7 @@ async def generate_summary(conversation_text: str) -> dict:
 
         return json.loads(content)
 
-    except Exception as e:
+    except (Exception, asyncio.CancelledError) as e:
         logger.error(f"Summary generation failed: {e}")
         return _fallback_summary()
 

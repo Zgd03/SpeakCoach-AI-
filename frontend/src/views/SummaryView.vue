@@ -10,19 +10,23 @@ const sessionId = route.params.sessionId;
 const summary = ref(null);
 const loading = ref(true);
 const error = ref(null);
+const isFallback = ref(false);
 
 onMounted(async () => {
   try {
-    // Try to get the summary; if not generated yet, it will use session data
     let data;
     try {
       data = await fetchSummary(sessionId);
     } catch {
-      // If summary endpoint not implemented yet, use session info
+      // Backend returned error — use session info as fallback
+      isFallback.value = true;
       const session = await fetchSession(sessionId);
+      const overall = session.overall_score;
       data = {
-        overall_score: session.overall_score || 0,
-        dimensions: { grammar: 0, fluency: 0, vocabulary: 0, pronunciation: 0 },
+        overall_score: overall && overall > 0 ? overall : 0,
+        dimensions: overall && overall > 0
+          ? { grammar: overall, fluency: overall, vocabulary: overall, pronunciation: overall }
+          : { grammar: 0, fluency: 0, vocabulary: 0, pronunciation: 0 },
         strengths: [],
         weaknesses: [],
         tips: [],
@@ -61,6 +65,70 @@ function dimensionLabel(key) {
   };
   return labels[key] || key;
 }
+
+function exportSummary() {
+  if (!summary.value) return;
+  const s = summary.value;
+
+  const date = new Date().toLocaleString("zh-CN");
+  let text = `# 📊 SpeakCoach AI 课后总结报告\n\n`;
+  text += `- **场景**：${s.scenario_name || "对话练习"}\n`;
+  text += `- **导出时间**：${date}\n\n`;
+  text += `---\n\n`;
+  text += `## 综合评分\n\n`;
+  text += `**${Math.round(s.overall_score)} / 100**\n\n`;
+  if (s.dimensions) {
+    text += `| 维度 | 分数 |\n`;
+    text += `| --- | --- |\n`;
+    for (const [key, value] of Object.entries(s.dimensions)) {
+      text += `| ${dimensionLabel(key)} | ${Math.round(value)} / 100 |\n`;
+    }
+    text += "\n";
+  }
+  text += `---\n\n`;
+  text += `## ✅ 优势\n\n`;
+  if (s.strengths && s.strengths.length > 0) {
+    s.strengths.forEach((item) => { text += `- ${item}\n`; });
+  } else {
+    text += `（暂无数据）\n`;
+  }
+  text += `\n---\n\n`;
+  text += `## 💪 待改进\n\n`;
+  if (s.weaknesses && s.weaknesses.length > 0) {
+    s.weaknesses.forEach((item) => { text += `- ${item}\n`; });
+  } else {
+    text += `（暂无数据）\n`;
+  }
+  text += `\n---\n\n`;
+  text += `## 📌 改进建议\n\n`;
+  if (s.tips && s.tips.length > 0) {
+    s.tips.forEach((item) => { text += `1. ${item}\n`; });
+  } else {
+    text += `（暂无数据）\n`;
+  }
+  if (s.corrected_dialogue && s.corrected_dialogue.length > 0) {
+    text += `\n---\n\n`;
+    text += `## 📝 对话校正\n\n`;
+    s.corrected_dialogue.forEach((item, i) => {
+      text += `### ${i + 1}. 原文\n`;
+      text += `> ~~${item.original}~~\n\n`;
+      text += `**校正**：${item.corrected}\n\n`;
+      text += `*${item.explanation}*\n\n`;
+    });
+  }
+  text += `---\n\n`;
+  text += `*由 SpeakCoach AI 自动生成*\n`;
+
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `speakcoach-总结-${date.replace(/[/:]/g, "-")}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 </script>
 
 <template>
@@ -76,6 +144,9 @@ function dimensionLabel(key) {
     </div>
 
     <div v-else-if="summary" class="summary-content">
+      <div v-if="isFallback" class="fallback-banner">
+        ⚠️ AI 总结生成失败，显示基本数据
+      </div>
       <div class="summary-header">
         <h2>📊 课后总结</h2>
         <p class="scenario-name">{{ summary.scenario_name }}</p>
@@ -160,6 +231,7 @@ function dimensionLabel(key) {
       <div class="summary-actions">
         <button class="btn btn-primary" @click="goHome">继续练习</button>
         <button class="btn btn-secondary" @click="goToHistory">查看历史</button>
+        <button class="btn btn-secondary" @click="exportSummary">📥 导出总结</button>
       </div>
     </div>
   </div>
@@ -182,6 +254,16 @@ function dimensionLabel(key) {
 .summary-header {
   text-align: center;
   margin-bottom: 24px;
+}
+
+.fallback-banner {
+  text-align: center;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .summary-header h2 {

@@ -11,13 +11,25 @@ const props = defineProps({
   },
 });
 
-function toggle() {
-  if (props.isProcessing) return;
+function onPress() {
+  if (props.isProcessing || props.isRecording) return;
+  emit("start");
+}
+
+function onRelease() {
   if (props.isRecording) {
     emit("stop");
-  } else {
-    emit("start");
   }
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  onPress();
+}
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  onRelease();
 }
 </script>
 
@@ -26,12 +38,16 @@ function toggle() {
     class="voice-btn"
     :class="{ recording: isRecording, processing: isProcessing }"
     :disabled="isProcessing"
-    @click="toggle"
+    @mousedown="onPress"
+    @mouseup="onRelease"
+    @mouseleave="onRelease"
+    @touchstart.prevent="onTouchStart"
+    @touchend.prevent="onTouchEnd"
   >
     <span v-if="isProcessing" class="spinner"></span>
-    <span v-else class="mic-icon">{{ isRecording ? "🔴" : "🎤" }}</span>
+    <span v-else class="mic-icon">{{ isRecording ? "🔊" : "🎤" }}</span>
     <span class="btn-label">
-      {{ isProcessing ? "处理中..." : isRecording ? "点击停止" : "开始录音" }}
+      {{ isProcessing ? "AI 响应中..." : isRecording ? "松开以发送" : "按住说话" }}
     </span>
   </button>
 </template>

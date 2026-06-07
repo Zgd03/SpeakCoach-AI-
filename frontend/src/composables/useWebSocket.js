@@ -8,11 +8,29 @@ export function useWebSocket() {
   const currentScores = ref(null);
   const error = ref(null);
   const audioPlaying = ref(false);
+  const awaitingReply = ref(false);
+  const reconnecting = ref(false);
 
   let pendingResolve = null;
   let audioQueue = Promise.resolve(); // promise-chain for sequential playback
+  let reconnectUrl = null;
+  let reconnectAttempts = 0;
+  let intentionalClose = false;
+  const MAX_RECONNECT_ATTEMPTS = 5;
+  const RECONNECT_BASE_DELAY = 1000;
+
+  function _scheduleReconnect() {
+    if (intentionalClose || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts), 10000);
+    reconnectAttempts++;
+    reconnecting.value = true;
+    setTimeout(() => connect(reconnectUrl), delay);
+  }
 
   function connect(url) {
+    if (!url && reconnectUrl) url = reconnectUrl;
+    reconnectUrl = url;
+
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
     const fullUrl = `${protocol}//${host}${url}`;
@@ -22,6 +40,8 @@ export function useWebSocket() {
     ws.value.onopen = () => {
       connected.value = true;
       error.value = null;
+      reconnecting.value = false;
+      reconnectAttempts = 0;
     };
 
     ws.value.onmessage = (event) => {
@@ -29,6 +49,7 @@ export function useWebSocket() {
 
       switch (data.type) {
         case "ai_reply":
+          awaitingReply.value = false;
           // Store audio data on the assistant message for replay
           if (data.audio) {
             messages.value.push({
@@ -67,6 +88,7 @@ export function useWebSocket() {
           break;
 
         case "error":
+          awaitingReply.value = false;
           error.value = data.message;
           break;
       }
@@ -74,6 +96,7 @@ export function useWebSocket() {
 
     ws.value.onclose = () => {
       connected.value = false;
+      _scheduleReconnect();
     };
 
     ws.value.onerror = () => {
@@ -89,6 +112,7 @@ export function useWebSocket() {
         content: text,
         corrections: [],
       });
+      awaitingReply.value = true;
       ws.value.send(JSON.stringify({ type: "user_message", text }));
     }
   }
@@ -154,6 +178,8 @@ export function useWebSocket() {
   }
 
   function disconnect() {
+    intentionalClose = true;
+    reconnecting.value = false;
     if (ws.value) {
       ws.value.close();
     }
@@ -166,6 +192,8 @@ export function useWebSocket() {
     currentScores,
     error,
     audioPlaying,
+    awaitingReply,
+    reconnecting,
     connect,
     sendMessage,
     replayAudio,

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -86,7 +87,7 @@ async def call_deepseek(system_prompt: str, conversation_history: list[dict]) ->
         result = json.loads(content)
         return result
 
-    except Exception as e:
+    except (Exception, asyncio.CancelledError) as e:
         logger.error(f"DeepSeek API call failed: {e}")
         return _fallback_response(
             conversation_history[-1]["content"] if conversation_history else ""

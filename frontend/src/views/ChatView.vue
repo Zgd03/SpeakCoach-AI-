@@ -19,6 +19,8 @@ const {
   currentCorrections,
   currentScores,
   audioPlaying,
+  awaitingReply,
+  reconnecting,
   error: wsError,
   connect,
   sendMessage,
@@ -27,7 +29,6 @@ const {
 } = useWebSocket();
 
 const inputText = ref("");
-const isProcessing = ref(false);
 const messagesEnd = ref(null);
 const sessionLoaded = ref(false);
 
@@ -67,35 +68,24 @@ watch(
   }
 );
 
-// When speech recognition returns transcript, send it
-watch(transcript, (val) => {
-  if (val) {
-    isProcessing.value = true;
-    sendMessage(val);
-    // Reset after a short delay
-    setTimeout(() => {
-      isProcessing.value = false;
-    }, 1000);
-  }
-});
-
 function sendTextMessage() {
   const text = inputText.value.trim();
   if (!text) return;
-  isProcessing.value = true;
   sendMessage(text);
   inputText.value = "";
-  setTimeout(() => {
-    isProcessing.value = false;
-  }, 1000);
 }
 
 function handleRecordStart() {
+  transcript.value = ""; // clear previous transcript
   startSpeech();
 }
 
-function handleRecordStop() {
-  stopSpeech();
+async function handleRecordStop() {
+  const text = await stopSpeech();
+  if (text?.trim()) {
+    sendMessage(text.trim());
+    transcript.value = "";
+  }
 }
 
 async function handleEndSession() {
@@ -124,7 +114,8 @@ function handleKeydown(e) {
     <div class="chat-header">
       <h2>💬 对话练习</h2>
       <div class="header-actions">
-        <span v-if="!connected" class="status disconnected">未连接</span>
+        <span v-if="!connected && !reconnecting" class="status disconnected">未连接</span>
+        <span v-else-if="reconnecting" class="status reconnecting">重连中…</span>
         <span v-else class="status connected">已连接</span>
         <button class="btn btn-secondary btn-sm" @click="handleEndSession">
           结束练习
@@ -172,6 +163,15 @@ function handleKeydown(e) {
         :has-audio="!!msg.audioData"
         @replay="handleReplay(i)"
       />
+      <!-- AI thinking indicator -->
+      <div v-if="awaitingReply" class="thinking-indicator">
+        <div class="thinking-dots">
+          <span class="dot dot1"></span>
+          <span class="dot dot2"></span>
+          <span class="dot dot3"></span>
+        </div>
+        <span>AI 思考中...</span>
+      </div>
       <div ref="messagesEnd" />
     </div>
 
@@ -182,7 +182,7 @@ function handleKeydown(e) {
     <div class="input-area">
       <VoiceRecorder
         :is-recording="isListening"
-        :is-processing="isProcessing"
+        :is-processing="awaitingReply"
         @start="handleRecordStart"
         @stop="handleRecordStop"
       />
@@ -193,9 +193,9 @@ function handleKeydown(e) {
           class="text-input"
           placeholder="或输入文字..."
           @keydown="handleKeydown"
-          :disabled="isProcessing"
+          :disabled="awaitingReply"
         />
-        <button class="btn btn-primary" @click="sendTextMessage" :disabled="isProcessing || !inputText.trim()">
+        <button class="btn btn-primary" @click="sendTextMessage" :disabled="awaitingReply || !inputText.trim()">
           发送
         </button>
       </div>
@@ -244,6 +244,11 @@ function handleKeydown(e) {
 .status.disconnected {
   background: #fce7f3;
   color: #9d174d;
+}
+
+.status.reconnecting {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .btn-sm {
@@ -312,6 +317,54 @@ function handleKeydown(e) {
 .opening-prompt .spinner {
   width: 32px;
   height: 32px;
+}
+
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  color: #6b7280;
+  font-size: 14px;
+  animation: fadeIn 0.3s ease;
+}
+
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4f46e5;
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+.dot2 {
+  animation-delay: 0.2s;
+}
+
+.dot3 {
+  animation-delay: 0.4s;
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .input-area {
